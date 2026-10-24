@@ -90,3 +90,71 @@ def verify_splice(host, spliced, donor, info, atol=1e-5):
     assert np.allclose(inside[core], expected[core], atol=atol), \
         "interval does not match donor"
     return True
+
+
+import subprocess
+import tempfile
+import os
+import soundfile as sf
+from scipy.signal import correlate
+
+
+def add_noise(x, snr_db, seed):
+    """Add white Gaussian noise at a target SNR. Returns (noisy, info)."""
+    rng = np.random.default_rng(seed)
+    x64 = x.astype(np.float64)
+    p_sig = np.mean(x64 ** 2)
+    p_noise = p_sig / (10 ** (snr_db / 10))
+    noise = rng.standard_normal(len(x64)) * np.sqrt(p_noise)
+    noisy = x64 + noise
+    achieved = 10 * np.log10(p_sig / np.mean(noise ** 2))
+    peak = np.max(np.abs(noisy))
+    if peak > 0.99:
+        noisy *= 0.99 / peak
+    return noisy.astype(x.dtype), {
+        "target_snr_db": snr_db, "achieved_snr_db": float(achieved), "seed": seed}
+
+
+def estimate_delay(ref, test, max_lag=4000):
+    """Lag (samples) of `test` relative to `ref`; positive = test is late."""
+    n = min(len(ref), len(test))
+    a = ref[:n].astype(np.float64)
+    b = test[:n].astype(np.float64)
+    c = correlate(b, a, mode="full", method="fft")
+    lags = np.arange(-(n - 1), n)
+    keep = np.abs(lags) <= max_lag
+    return int(lags[keep][np.argmax(c[keep])])
+
+
+def compress_roundtrip(x, codec="mp3", bitrate_kbps=128, sr=SR):
+    """Encode with ffmpeg, decode back, remove delay, restore exact length.
+    Returns (decoded, info)."""
+    ext = {"mp3": "mp3", "aac": "m4a"}[codec]
+    lib = {"mp3": "libmp3lame", "aac": "aac"}[codec]
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, "in.wav")
+        enc = os.path.join(d, f"enc.{ext}")
+        dec = os.path.join(d, "out.wav")
+        sf.write(src, x, sr, subtype="FLOAT")
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", src, "-c:a", lib, "-b:a", f"{bitrate_kbps}k", enc],
+                       check=True)
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", enc, "-ac", "1", "-ar", str(sr), dec], check=True)
+        y, _ = sf.read(dec, dtype="float64")
+
+    lag = estimate_delay(x, y)
+    if lag > 0:
+        y = y[lag:]
+    elif lag < 0:
+        y = np.concatenate([np.zeros(-lag), y])
+    if len(y) >= len(x):
+        y = y[:len(x)]
+    else:
+        y = np.concatenate([y, np.zeros(len(x) - len(y))])
+
+    residual = estimate_delay(x, y)
+    return y.astype(x.dtype), {
+        "codec": codec, "bitrate_kbps": bitrate_kbps,
+        "delay_removed_samples": lag, "residual_delay_samples": residual,
+        "tool": "ffmpeg " + lib}

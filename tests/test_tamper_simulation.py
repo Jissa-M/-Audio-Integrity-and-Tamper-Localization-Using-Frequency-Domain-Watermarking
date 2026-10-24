@@ -54,3 +54,34 @@ def test_rejects_short_donor(host):
     short = make_signal(3, seconds=2)
     with pytest.raises(ValueError):
         splice(host, short, 5.0, 8.0)
+
+
+
+from tamper_simulation import add_noise, compress_roundtrip, estimate_delay
+
+
+@pytest.mark.parametrize("snr", [40, 30, 20])
+def test_noise_hits_target_snr(host, snr):
+    noisy, info = add_noise(host, snr, seed=7)
+    measured = 10 * np.log10(np.mean(host.astype(float) ** 2)
+                             / np.mean((noisy.astype(float) - host) ** 2))
+    assert abs(measured - snr) < 0.5
+    assert abs(info["achieved_snr_db"] - snr) < 0.5
+
+
+def test_noise_is_reproducible(host):
+    a, _ = add_noise(host, 30, seed=3)
+    b, _ = add_noise(host, 30, seed=3)
+    assert np.array_equal(a, b)
+
+
+def test_estimate_delay_known_shift(host):
+    shifted = np.concatenate([np.zeros(100, dtype=host.dtype), host])[:len(host)]
+    assert estimate_delay(host, shifted) == 100
+
+
+@pytest.mark.parametrize("kbps", [192, 128, 64])
+def test_compression_is_aligned_and_same_length(host, kbps):
+    y, info = compress_roundtrip(host, "mp3", kbps)
+    assert len(y) == len(host)
+    assert info["residual_delay_samples"] == 0

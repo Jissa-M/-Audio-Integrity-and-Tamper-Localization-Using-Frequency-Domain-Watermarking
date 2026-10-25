@@ -175,8 +175,14 @@ WRONG_KEY = "some_other_key"
 SPLICE_LENGTHS = [0.5, 1.0, 2.0, 3.0, 5.0]
 POSITIONS = ["early", "mid", "late"]
 # Provisional split for the few clips we have. Revise when all 12 exist.
-SPLITS = {"src01": "validation", "src02": "validation",
-          "src03": "test", "src04": "test"}
+SPLITS = {
+    # training (Member 2 tunes the watermark on these)
+    "src01": "training", "src05": "training", "src09": "training", "src10": "training",
+    # validation (Member 4 calibrates the threshold)
+    "src02": "validation", "src06": "validation", "src03": "validation", "src11": "validation",
+    # test (final numbers only)
+    "src04": "test", "src07": "test", "src08": "test", "src12": "test",
+}
 
 
 def _fit(y, n):

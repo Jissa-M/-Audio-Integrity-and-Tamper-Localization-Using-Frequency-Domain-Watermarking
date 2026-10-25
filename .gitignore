@@ -1,4 +1,4 @@
-data/sources/
-data/donors/
+data/sources/raw/
+data/scratch/
 data/generated/
 __pycache__/

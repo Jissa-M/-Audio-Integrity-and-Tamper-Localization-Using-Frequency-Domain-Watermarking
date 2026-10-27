@@ -4,7 +4,7 @@ import librosa
 N_FFT = 1024
 HOP_LENGTH = 256
 
-def load_audio(path, sr=22050):
+def load_audio(path, sr=16000):
     y, sr = librosa.load(path, sr=sr, mono=True)
     return y, sr
 

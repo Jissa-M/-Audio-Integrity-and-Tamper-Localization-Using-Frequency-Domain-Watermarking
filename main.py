@@ -1,3 +1,4 @@
+"""Member 4 entry point. Run from repository root; see MEMBER4_README.txt."""
 import argparse
 import csv
 import hashlib
@@ -256,4 +257,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

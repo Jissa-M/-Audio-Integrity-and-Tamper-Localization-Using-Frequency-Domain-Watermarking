@@ -1,3 +1,4 @@
+"""Member 4: validated evidence -> window scores -> estimated intervals."""
 import csv
 from pathlib import Path
 import numpy as np
@@ -105,4 +106,3 @@ def save_csv(path, rows, fields):
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(rows)
-

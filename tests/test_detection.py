@@ -133,4 +133,3 @@ def test_real_watermark_splice_integration():
     windows = score_windows(wm.extract(tampered, 'integration-test'), 10)
     predictions = detect_intervals(windows, threshold)
     assert any(min(p['end'], 7) > max(p['start'], 4) for p in predictions)
-

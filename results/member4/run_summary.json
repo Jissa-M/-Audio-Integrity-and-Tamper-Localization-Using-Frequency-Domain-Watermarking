@@ -1,0 +1,43 @@
+{
+  "status": "completed",
+  "calibration_sha256": "2218444bc310af7ce3dd122905ebdf48918c2bf998dcd0587f465b31d36577fc",
+  "summary": {
+    "tp": 65,
+    "fp": 17,
+    "fn": 167,
+    "tn": 4807,
+    "undetermined_windows": 276,
+    "undetermined_tampered_windows": 19,
+    "total_windows": 5056,
+    "truth_intervals": 28,
+    "predicted_intervals": 45,
+    "missed_splices": 7,
+    "extra_intervals": 24,
+    "files": 64,
+    "benign_files": 40,
+    "spliced_files": 24,
+    "precision": 0.7926829268292683,
+    "recall": 0.2801724137931034,
+    "f1": 0.4140127388535032,
+    "file_false_positive_rate": 0.125,
+    "file_detection_rate": 0.8333333333333334,
+    "window_false_positive_rate": 0.0035240464344941957,
+    "evidence_coverage": 0.9454113924050633,
+    "mean_iou_including_misses": 0.2939331005924747,
+    "iou_matched": {
+      "mean": 0.3919108007899662,
+      "median": 0.3517166801838337,
+      "worst": 0.09999999999999998
+    },
+    "start_error_matched": {
+      "mean": 0.6671339285714285,
+      "median": 0.42474999999999996,
+      "worst": 2.7281875000000007
+    },
+    "end_error_matched": {
+      "mean": 1.0300625,
+      "median": 0.588000000000001,
+      "worst": 4.408625000000001
+    }
+  }
+}

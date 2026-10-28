@@ -2,3 +2,9 @@ data/sources/raw/
 data/scratch/
 data/generated/
 __pycache__/
+
+.venv/
+.pytest_cache/
+.pytest-tmp-*/
+results/member4*/audio/
+results/member4*/evidence/

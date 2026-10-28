@@ -221,18 +221,54 @@ def evaluate(root, plot_limit=6):
 
 
 def synthetic(root):
-    cfg = DetectorConfig(); rng = np.random.default_rng(2026)
+    cfg = DetectorConfig()
+    rng = np.random.default_rng(2026)
     t = np.arange(0, 15, cfg.hop / cfg.sample_rate)
-    score = np.clip(.8 + rng.normal(0, .025, len(t)), -1, 1)
-    score[(t >= 5) & (t < 8)] = .05
-    ev = dict(frame_index=np.arange(len(t)), time_seconds=t, watermark_score=score, valid=np.ones(len(t), bool))
-    windows = score_windows(ev, 15., cfg); predictions = detect_intervals(windows, .4)
-    dump(root / 'synthetic_only.json', {'label': 'SYNTHETIC SCORES ONLY - not audio performance',
-                                       'intervals': predictions,
-                                       'metrics': summarize([evaluate_file(windows, predictions, [(5., 8.)])])})
-    comparison(root / 'synthetic_only.png', 'Synthetic score test (not real audio results)', ev,
-               windows, predictions, [(5., 8.)], .4)
-    print('Synthetic detector check:', predictions)
+
+    def make_evidence(scores):
+        valid = np.ones(len(t), dtype=bool)
+        valid[0] = valid[-1] = False
+        scores = scores.copy()
+        scores[~valid] = 0.0
+        return {
+            'frame_index': np.arange(len(t)),
+            'time_seconds': t,
+            'watermark_score': scores,
+            'valid': valid,
+        }
+
+    # Independent synthetic validation evidence: intact scores.
+    validation = make_evidence(
+        np.clip(rng.normal(0.07, 0.08, len(t)), -1, 1)
+    )
+    threshold = calibrate_threshold(
+        score_windows(validation, 15.0, cfg), cfg
+    )
+
+    # Separate synthetic test evidence with a known splice.
+    scores = rng.normal(0.07, 0.08, len(t))
+    dip = (t >= 5.0) & (t < 8.0)
+    scores[dip] = rng.normal(0.0, 0.08, dip.sum())
+    ev = make_evidence(np.clip(scores, -1, 1))
+
+    windows = score_windows(ev, 15.0, cfg)
+    predictions = detect_intervals(windows, threshold)
+
+    dump(root / 'synthetic_only.json', {
+        'label': 'SYNTHETIC SCORES ONLY - not audio performance',
+        'threshold': threshold,
+        'intervals': predictions,
+        'metrics': summarize([
+            evaluate_file(windows, predictions, [(5.0, 8.0)])
+        ]),
+    })
+    comparison(
+        root / 'synthetic_only.png',
+        'Synthetic score test (not real audio results)',
+        ev, windows, predictions, [(5.0, 8.0)], threshold,
+    )
+    print('Synthetic threshold:', threshold)
+    print('Synthetic detected intervals:', predictions)
 
 
 def main():

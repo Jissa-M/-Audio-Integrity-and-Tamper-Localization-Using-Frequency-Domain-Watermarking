@@ -23,8 +23,12 @@ Design
       capped at ALPHA_MAX, so quiet frames carry more of the watermark (global SNR is
       energy-weighted, so they cost little). Extraction does not depend on it.
     * Frames whose band level is below ENERGY_FLOOR are not embedded.
-    * Extraction is blind: log-magnitude, remove smoothed spectral envelope,
-      normalized correlation with the expected pattern -> score in [-1, 1].
+    * Extraction is blind: log-magnitude, remove stable per-bin host structure (median of
+      neighbouring frames outside the frame's own pattern block; EXTRACT_MODE="temporal"),
+      remove the smoothed spectral envelope, then normalized correlation with the
+      expected pattern -> score in [-1, 1]. EXTRACT_MODE="spectral" skips the temporal
+      step (slightly better on speech, much weaker on sustained tonal music). Changing
+      the mode needs no re-embedding.
     * Quiet / edge / low-residual frames are valid = False (not "tampered").
     * Input must be float audio in [-1, 1]; output is scaled down only if its peak
       would exceed 1 (no clipping).
@@ -60,6 +64,8 @@ ENV_SMOOTH_BINS = 21    # spectral-envelope smoothing width (bins)
 PATTERN_BLOCK = 4       # frames sharing one pattern (= N_FFT // HOP) so the change survives overlap-add
 ITERS = 3               # consistency iterations (STFT -> re-impose target magnitudes -> ISTFT)
 ALPHA_MIN, ALPHA_MAX = 0.03, 0.60   # bounds for adaptive strength (ALPHA_MAX also caps per-frame strength)
+EXTRACT_MODE = "temporal"   # "spectral" (remove envelope across bins) or "temporal" (also remove stable per-bin host structure over time)
+TEMPORAL_HALF = 12      # frames each side used for the per-bin temporal median (own pattern block excluded)
 GAMMA = 1.0             # per-frame strength shaping: alpha_t ~ (ref_level / level_t) ** GAMMA (0 = flat)
 TARGET_SNR_DB = 30.0    # adaptive mode: strongest alpha that still gives SNR >= this (None = fixed ALPHA)
 KEY_ID = "default"      # recorded in settings for reproducibility
@@ -219,10 +225,17 @@ def extract(audio, key):
 
     scores = np.zeros(n)
     valid = np.zeros(n, dtype=bool)
+    LB = np.log(mag[:, band] + 1e-9)
     for t in range(n):
         if t == 0 or t == n - 1 or level[t] < ENERGY_FLOOR:
             continue  # edge / quiet frame -> invalid
-        logm = np.log(mag[t, band] + 1e-9)
+        logm = LB[t]
+        if EXTRACT_MODE == "temporal":
+            blk = t // PATTERN_BLOCK
+            lo, hi = max(0, t - TEMPORAL_HALF), min(n, t + TEMPORAL_HALF + 1)
+            nb = np.array([u for u in range(lo, hi) if u // PATTERN_BLOCK != blk and level[u] >= ENERGY_FLOOR])
+            if len(nb) >= 4:
+                logm = logm - np.median(LB[nb], axis=0)
         resid = logm - _smooth_envelope(logm)
         sel, pn = _frame_pattern(k, t, band)
         r = resid[np.searchsorted(band, sel)]
@@ -277,7 +290,8 @@ def get_settings():
     return {"key_id": KEY_ID, "sr": SR, "n_fft": N_FFT, "hop": HOP, "band_hz": BAND_HZ,
             "n_bins": N_BINS, "pattern_block": PATTERN_BLOCK, "iters": ITERS,
             "alpha_fixed": ALPHA, "alpha_min": ALPHA_MIN, "alpha_max": ALPHA_MAX,
-            "target_snr_db": TARGET_SNR_DB, "gamma": GAMMA, "energy_floor": ENERGY_FLOOR,
+            "target_snr_db": TARGET_SNR_DB, "gamma": GAMMA,
+            "extract_mode": EXTRACT_MODE, "temporal_half": TEMPORAL_HALF, "energy_floor": ENERGY_FLOOR,
             "resid_floor": RESID_FLOOR, "env_smooth_bins": ENV_SMOOTH_BINS}
 
 

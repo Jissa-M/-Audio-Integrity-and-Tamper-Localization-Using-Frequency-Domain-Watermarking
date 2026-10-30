@@ -19,6 +19,9 @@ Design
       runs ITERS consistency iterations (re-analyse, re-impose target magnitudes).
     * alpha is adaptive by default: the strongest value in [ALPHA_MIN, ALPHA_MAX]
       that keeps SNR >= TARGET_SNR_DB. Extraction does not depend on alpha.
+    * Per-frame strength is shaped by loudness: alpha_t ~ (ref_level / level_t) ** GAMMA,
+      capped at ALPHA_MAX, so quiet frames carry more of the watermark (global SNR is
+      energy-weighted, so they cost little). Extraction does not depend on it.
     * Frames whose band level is below ENERGY_FLOOR are not embedded.
     * Extraction is blind: log-magnitude, remove smoothed spectral envelope,
       normalized correlation with the expected pattern -> score in [-1, 1].
@@ -51,12 +54,13 @@ HOP = _SH_HOP if _SHARED else 256        # 16 ms, 75% overlap
 BAND_HZ = (1500.0, 6000.0)
 N_BINS = 150            # selected bins per frame (100-200 suggested)
 ALPHA = 0.35            # fixed-mode strength (relative magnitude change); tune
-ENERGY_FLOOR = 1e-3     # min band level (per-bin amplitude units) to embed / be valid
+ENERGY_FLOOR = 1e-4     # min band level (per-bin amplitude units) to embed / be valid
 RESID_FLOOR = 1e-6      # min residual norm for a valid score
 ENV_SMOOTH_BINS = 21    # spectral-envelope smoothing width (bins)
 PATTERN_BLOCK = 4       # frames sharing one pattern (= N_FFT // HOP) so the change survives overlap-add
 ITERS = 3               # consistency iterations (STFT -> re-impose target magnitudes -> ISTFT)
-ALPHA_MIN, ALPHA_MAX = 0.10, 0.60   # bounds for adaptive strength
+ALPHA_MIN, ALPHA_MAX = 0.03, 0.60   # bounds for adaptive strength (ALPHA_MAX also caps per-frame strength)
+GAMMA = 1.0             # per-frame strength shaping: alpha_t ~ (ref_level / level_t) ** GAMMA (0 = flat)
 TARGET_SNR_DB = 30.0    # adaptive mode: strongest alpha that still gives SNR >= this (None = fixed ALPHA)
 KEY_ID = "default"      # recorded in settings for reproducibility
 
@@ -134,11 +138,16 @@ def _embed_once(x, key_int, alpha):
     spec, total = _stft(x)
     mag, phase = np.abs(spec), np.angle(spec)
     level = _band_level(mag[:, band])
+    ok = level >= ENERGY_FLOOR
+    a_t = np.full(len(level), alpha)
+    if GAMMA > 0 and ok.any():
+        ref = np.median(level[ok])
+        a_t = np.minimum(ALPHA_MAX, alpha * (ref / np.maximum(level, ENERGY_FLOOR)) ** GAMMA)
     for t in range(spec.shape[0]):
-        if level[t] < ENERGY_FLOOR:
+        if not ok[t]:
             continue  # too quiet to carry the watermark
         sel, pn = _frame_pattern(key_int, t, band)
-        mag[t, sel] *= 1.0 + alpha * pn
+        mag[t, sel] *= 1.0 + a_t[t] * pn
     target = mag
     y = _istft(target * np.exp(1j * phase), total, len(x))
     for _ in range(ITERS):  # make the STFT of the output match the target magnitudes
@@ -268,7 +277,7 @@ def get_settings():
     return {"key_id": KEY_ID, "sr": SR, "n_fft": N_FFT, "hop": HOP, "band_hz": BAND_HZ,
             "n_bins": N_BINS, "pattern_block": PATTERN_BLOCK, "iters": ITERS,
             "alpha_fixed": ALPHA, "alpha_min": ALPHA_MIN, "alpha_max": ALPHA_MAX,
-            "target_snr_db": TARGET_SNR_DB, "energy_floor": ENERGY_FLOOR,
+            "target_snr_db": TARGET_SNR_DB, "gamma": GAMMA, "energy_floor": ENERGY_FLOOR,
             "resid_floor": RESID_FLOOR, "env_smooth_bins": ENV_SMOOTH_BINS}
 
 

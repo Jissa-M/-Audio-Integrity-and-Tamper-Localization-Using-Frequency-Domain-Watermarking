@@ -1,24 +1,33 @@
 """Frequency-domain watermark: embedding and blind extraction (Member 2).
 
 Public API
-    embed(audio, key)            -> watermarked audio, same length (float, 16 kHz)
-    extract(audio, key)          -> per-frame evidence (one row per STFT frame)
-    save_evidence_csv(ev, path)  -> writes frame_index,time_seconds,watermark_score,valid
-    snr_db(a, b), lsd_db(a, b)   -> quality metrics
-    get_settings()               -> parameters needed to reproduce extraction
+    embed(audio, key)               -> watermarked audio, same length (float in [-1, 1], 16 kHz)
+    embed_with_info(audio, key)     -> (audio, info) with the alpha used, SNR and peak-scaling flag
+    extract(audio, key)             -> per-frame evidence (one row per STFT frame)
+    summarize_evidence(ev)          -> mean valid score, valid fraction, frame count
+    save_evidence_csv(ev, path)     -> writes frame_index,time_seconds,watermark_score,valid
+    snr_db(a, b), lsd_db(a, b)      -> quality metrics
+    get_settings()                  -> parameters needed to reproduce extraction
 
-Design (matches the project README)
-    * STFT: Hann, 1024 window, 256 hop, 16 kHz.
-    * Per frame, a key- and frame-index-dependent set of N_BINS bins is chosen
-      pseudo-randomly inside the 1.5-6 kHz band, with a +/-1 pattern.
-    * Embedding multiplies those magnitudes by (1 + ALPHA * pattern); phase is kept.
-    * Frames whose band level is below ENERGY_FLOOR are skipped (not embedded).
+Design
+    * STFT: Hann, 1024 window, 256 hop, 16 kHz (shared with audio_processing.py).
+    * A key- and block-dependent set of N_BINS bins is chosen pseudo-randomly in the
+      1.5-6 kHz band, with a +/-1 pattern. The pattern is constant for PATTERN_BLOCK
+      (=4) consecutive frames so it survives overlap-add; it changes between blocks,
+      so spliced, deleted or shifted regions stop matching.
+    * Embedding multiplies those magnitudes by (1 + alpha * pattern), keeps phase, and
+      runs ITERS consistency iterations (re-analyse, re-impose target magnitudes).
+    * alpha is adaptive by default: the strongest value in [ALPHA_MIN, ALPHA_MAX]
+      that keeps SNR >= TARGET_SNR_DB. Extraction does not depend on alpha.
+    * Frames whose band level is below ENERGY_FLOOR are not embedded.
     * Extraction is blind: log-magnitude, remove smoothed spectral envelope,
       normalized correlation with the expected pattern -> score in [-1, 1].
-    * Quiet / edge / low-residual frames are marked valid = False (not "tampered").
+    * Quiet / edge / low-residual frames are valid = False (not "tampered").
+    * Input must be float audio in [-1, 1]; output is scaled down only if its peak
+      would exceed 1 (no clipping).
 
-NOTE: constants below mirror config.py. Once Member 1's config.py and the shared
-STFT/ISTFT in audio_processing.py exist, import from them instead (see _stft/_istft).
+NOTE: constants below mirror config.py. Shared STFT/ISTFT come from audio_processing.py
+when it can be imported; otherwise a local numpy version with the same settings is used.
 """
 import csv
 import hashlib
@@ -139,37 +148,49 @@ def _embed_once(x, key_int, alpha):
     return y
 
 
-def embed(audio, key, alpha=None):
-    """Embed the watermark. audio: 1-D float array at 16 kHz. Same-length output.
+def embed_with_info(audio, key, alpha=None):
+    """Embed the watermark and report what was done.
 
-    alpha=None and TARGET_SNR_DB set -> adaptive: strongest alpha in
-    [ALPHA_MIN, ALPHA_MAX] whose SNR is still >= TARGET_SNR_DB (extraction does not
-    depend on alpha, so strength may differ per file).
+    Returns (watermarked_audio, info). info: alpha used, snr_db, peak_scaled.
+    alpha=None and TARGET_SNR_DB set -> adaptive strength (see module docstring);
     alpha given (or TARGET_SNR_DB=None) -> fixed strength.
     """
     a = np.asarray(audio)
     if a.ndim != 1:
         raise ValueError("audio must be 1-D mono")
+    if np.issubdtype(a.dtype, np.integer):
+        raise ValueError("audio must be float in [-1, 1]; convert integer PCM first")
     if len(a) == 0:
-        return a.copy()
+        return a.copy(), {"alpha": 0.0, "snr_db": float("inf"), "peak_scaled": False}
     x = a.astype(np.float64)
     k = _key_to_int(key)
     if alpha is not None or TARGET_SNR_DB is None:
-        y = _embed_once(x, k, ALPHA if alpha is None else alpha)
+        used = ALPHA if alpha is None else alpha
+        y = _embed_once(x, k, used)
     else:
-        y = _embed_once(x, k, ALPHA_MAX)
+        used = ALPHA_MAX
+        y = _embed_once(x, k, used)
         if snr_db(x, y) < TARGET_SNR_DB:
             lo, hi = ALPHA_MIN, ALPHA_MAX
-            y = _embed_once(x, k, lo)  # fallback if even the weakest misses the target
+            used, y = lo, _embed_once(x, k, lo)  # fallback if even the weakest misses the target
             for _ in range(6):
                 mid = 0.5 * (lo + hi)
                 ym = _embed_once(x, k, mid)
                 if snr_db(x, ym) >= TARGET_SNR_DB:
-                    lo, y = mid, ym
+                    lo, used, y = mid, mid, ym
                 else:
                     hi = mid
-    out_dtype = a.dtype if np.issubdtype(a.dtype, np.floating) else np.float32
-    return y.astype(out_dtype)
+    info = {"alpha": float(used), "snr_db": snr_db(x, y), "peak_scaled": False}
+    peak = float(np.max(np.abs(y)))
+    if peak > 1.0:  # same rule as preprocessing: scale down only if it would clip
+        y = y / peak
+        info["peak_scaled"] = True
+    return y.astype(a.dtype if np.issubdtype(a.dtype, np.floating) else np.float32), info
+
+
+def embed(audio, key, alpha=None):
+    """Embed the watermark. audio: 1-D float array in [-1, 1] at 16 kHz. Same-length output."""
+    return embed_with_info(audio, key, alpha)[0]
 
 
 # ---- extraction (blind) -----------------------------------------------------
@@ -210,6 +231,14 @@ def extract(audio, key):
     }
 
 
+def summarize_evidence(ev):
+    """Quick health check of an extract() result."""
+    v = np.asarray(ev["valid"], dtype=bool)
+    sc = np.asarray(ev["watermark_score"])
+    return {"n_frames": int(len(v)), "valid_fraction": float(v.mean()) if len(v) else 0.0,
+            "mean_valid_score": float(sc[v].mean()) if v.any() else float("nan")}
+
+
 def save_evidence_csv(ev, path):
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
@@ -236,15 +265,17 @@ def lsd_db(original, processed):
 
 
 def get_settings():
-    return {"key_id": KEY_ID, "sr": SR, "n_fft": N_FFT, "hop": HOP,
-            "band_hz": BAND_HZ, "n_bins": N_BINS, "alpha": ALPHA,
-            "energy_floor": ENERGY_FLOOR, "env_smooth_bins": ENV_SMOOTH_BINS}
+    return {"key_id": KEY_ID, "sr": SR, "n_fft": N_FFT, "hop": HOP, "band_hz": BAND_HZ,
+            "n_bins": N_BINS, "pattern_block": PATTERN_BLOCK, "iters": ITERS,
+            "alpha_fixed": ALPHA, "alpha_min": ALPHA_MIN, "alpha_max": ALPHA_MAX,
+            "target_snr_db": TARGET_SNR_DB, "energy_floor": ENERGY_FLOOR,
+            "resid_floor": RESID_FLOOR, "env_smooth_bins": ENV_SMOOTH_BINS}
 
 
 if __name__ == "__main__":
     rng = np.random.default_rng(0)
-    x = (0.1 * rng.standard_normal(SR * 8)).astype(np.float32)
-    y = embed(x, "demo")
+    x = (0.05 * rng.standard_normal(SR * 8)).astype(np.float32)
+    y, info = embed_with_info(x, "demo")
     ev = extract(y, "demo")
-    print("length ok:", len(y) == len(x), "| SNR dB:", round(snr_db(x, y), 1))
-    print("mean valid score:", ev["watermark_score"][ev["valid"]].mean())
+    print("length ok:", len(y) == len(x), "| info:", info)
+    print("evidence:", summarize_evidence(ev))

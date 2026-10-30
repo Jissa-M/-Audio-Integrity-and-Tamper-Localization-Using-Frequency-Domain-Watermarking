@@ -25,16 +25,30 @@ import hashlib
 
 import numpy as np
 
+# Use Member 1's shared STFT / inverse STFT when available so frame counts and
+# time mapping match the rest of the pipeline. Falls back to a local numpy
+# implementation (same Hann/1024/256 settings) for standalone testing.
+try:
+    from audio_processing import compute_stft, reconstruct_audio
+    from audio_processing import N_FFT as _SH_NFFT, HOP_LENGTH as _SH_HOP
+    _SHARED = True
+except ImportError:
+    _SHARED = False
+
 # ---- parameters (keep in sync with config.py) -------------------------------
 SR = 16000
-N_FFT = 1024            # 64 ms
-HOP = 256               # 16 ms, 75% overlap
+N_FFT = _SH_NFFT if _SHARED else 1024   # 64 ms
+HOP = _SH_HOP if _SHARED else 256        # 16 ms, 75% overlap
 BAND_HZ = (1500.0, 6000.0)
 N_BINS = 150            # selected bins per frame (100-200 suggested)
-ALPHA = 0.20            # embedding strength (relative magnitude change); tune
+ALPHA = 0.35            # fixed-mode strength (relative magnitude change); tune
 ENERGY_FLOOR = 1e-3     # min band level (per-bin amplitude units) to embed / be valid
 RESID_FLOOR = 1e-6      # min residual norm for a valid score
 ENV_SMOOTH_BINS = 21    # spectral-envelope smoothing width (bins)
+PATTERN_BLOCK = 4       # frames sharing one pattern (= N_FFT // HOP) so the change survives overlap-add
+ITERS = 3               # consistency iterations (STFT -> re-impose target magnitudes -> ISTFT)
+ALPHA_MIN, ALPHA_MAX = 0.10, 0.60   # bounds for adaptive strength
+TARGET_SNR_DB = 30.0    # adaptive mode: strongest alpha that still gives SNR >= this (None = fixed ALPHA)
 KEY_ID = "default"      # recorded in settings for reproducibility
 
 
@@ -56,7 +70,7 @@ def _band_bins():
 
 def _frame_pattern(key_int, t, band):
     """Selected bins (sorted) and +/-1 pattern for frame t. Reproducible."""
-    rng = np.random.default_rng([key_int, int(t)])
+    rng = np.random.default_rng([key_int, int(t) // PATTERN_BLOCK])
     sel = np.sort(rng.choice(band, size=min(N_BINS, len(band)), replace=False))
     pn = rng.choice([-1.0, 1.0], size=len(sel))
     return sel, pn
@@ -64,6 +78,8 @@ def _frame_pattern(key_int, t, band):
 
 def _stft(x):
     """Centered STFT; frame t is centred on sample t*HOP. Returns (spec, padded_len)."""
+    if _SHARED:
+        return compute_stft(x).T, len(x)  # (bins, frames) -> (frames, bins)
     win = _window()
     pad = N_FFT // 2
     n_frames = int(np.ceil(len(x) / HOP)) + 1
@@ -75,6 +91,8 @@ def _stft(x):
 
 
 def _istft(spec, total, length):
+    if _SHARED:
+        return reconstruct_audio(spec.T, length)
     win = _window()
     frames = np.fft.irfft(spec, n=N_FFT, axis=1) * win
     out = np.zeros(total)
@@ -102,27 +120,54 @@ def _smooth_envelope(logm):
 
 
 # ---- embedding --------------------------------------------------------------
-def embed(audio, key, alpha=None):
-    """Embed the watermark. audio: 1-D float array at 16 kHz. Same-length output."""
-    a = np.asarray(audio)
-    if a.ndim != 1:
-        raise ValueError("audio must be 1-D mono")
-    if len(a) == 0:
-        return a.copy()
-    alpha = ALPHA if alpha is None else alpha
-    x = a.astype(np.float64)
-    k = _key_to_int(key)
+def _embed_once(x, key_int, alpha):
     band = _band_bins()
-
     spec, total = _stft(x)
     mag, phase = np.abs(spec), np.angle(spec)
     level = _band_level(mag[:, band])
     for t in range(spec.shape[0]):
         if level[t] < ENERGY_FLOOR:
             continue  # too quiet to carry the watermark
-        sel, pn = _frame_pattern(k, t, band)
+        sel, pn = _frame_pattern(key_int, t, band)
         mag[t, sel] *= 1.0 + alpha * pn
-    y = _istft(mag * np.exp(1j * phase), total, len(x))
+    target = mag
+    y = _istft(target * np.exp(1j * phase), total, len(x))
+    for _ in range(ITERS):  # make the STFT of the output match the target magnitudes
+        S, _t = _stft(y)
+        n = min(S.shape[0], target.shape[0])
+        y = _istft(target[:n] * np.exp(1j * np.angle(S[:n])), total, len(x))
+    return y
+
+
+def embed(audio, key, alpha=None):
+    """Embed the watermark. audio: 1-D float array at 16 kHz. Same-length output.
+
+    alpha=None and TARGET_SNR_DB set -> adaptive: strongest alpha in
+    [ALPHA_MIN, ALPHA_MAX] whose SNR is still >= TARGET_SNR_DB (extraction does not
+    depend on alpha, so strength may differ per file).
+    alpha given (or TARGET_SNR_DB=None) -> fixed strength.
+    """
+    a = np.asarray(audio)
+    if a.ndim != 1:
+        raise ValueError("audio must be 1-D mono")
+    if len(a) == 0:
+        return a.copy()
+    x = a.astype(np.float64)
+    k = _key_to_int(key)
+    if alpha is not None or TARGET_SNR_DB is None:
+        y = _embed_once(x, k, ALPHA if alpha is None else alpha)
+    else:
+        y = _embed_once(x, k, ALPHA_MAX)
+        if snr_db(x, y) < TARGET_SNR_DB:
+            lo, hi = ALPHA_MIN, ALPHA_MAX
+            y = _embed_once(x, k, lo)  # fallback if even the weakest misses the target
+            for _ in range(6):
+                mid = 0.5 * (lo + hi)
+                ym = _embed_once(x, k, mid)
+                if snr_db(x, ym) >= TARGET_SNR_DB:
+                    lo, y = mid, ym
+                else:
+                    hi = mid
     out_dtype = a.dtype if np.issubdtype(a.dtype, np.floating) else np.float32
     return y.astype(out_dtype)
 

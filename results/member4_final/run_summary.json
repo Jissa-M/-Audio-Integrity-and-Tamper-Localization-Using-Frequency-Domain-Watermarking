@@ -1,0 +1,43 @@
+{
+  "status": "completed",
+  "calibration_sha256": "8a7a36271544fc3c52947d08c22ed56b47d0b8c5678601e12c4ae2dc99250aec",
+  "summary": {
+    "tp": 71,
+    "fp": 8,
+    "fn": 161,
+    "tn": 4816,
+    "undetermined_windows": 7,
+    "undetermined_tampered_windows": 7,
+    "total_windows": 5056,
+    "truth_intervals": 28,
+    "predicted_intervals": 41,
+    "missed_splices": 7,
+    "extra_intervals": 20,
+    "files": 64,
+    "benign_files": 40,
+    "spliced_files": 24,
+    "precision": 0.8987341772151899,
+    "recall": 0.30603448275862066,
+    "f1": 0.4565916398713826,
+    "file_false_positive_rate": 0.025,
+    "file_detection_rate": 0.75,
+    "window_false_positive_rate": 0.001658374792703151,
+    "evidence_coverage": 0.9986155063291139,
+    "mean_iou_including_misses": 0.3262622866880229,
+    "iou_matched": {
+      "mean": 0.43501638225069705,
+      "median": 0.4166666666666667,
+      "worst": 0.14999999999999997
+    },
+    "start_error_matched": {
+      "mean": 0.627702380952381,
+      "median": 0.2980624999999999,
+      "worst": 2.9516875000000002
+    },
+    "end_error_matched": {
+      "mean": 1.0099702380952382,
+      "median": 0.3904375000000009,
+      "worst": 3.8421874999999996
+    }
+  }
+}

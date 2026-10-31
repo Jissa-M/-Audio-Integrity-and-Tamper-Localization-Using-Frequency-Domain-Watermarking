@@ -1,0 +1,158 @@
+{
+  "src04": {
+    "tp": 23,
+    "fp": 8,
+    "fn": 35,
+    "tn": 1198,
+    "undetermined_windows": 3,
+    "undetermined_tampered_windows": 3,
+    "total_windows": 1264,
+    "truth_intervals": 7,
+    "predicted_intervals": 15,
+    "missed_splices": 2,
+    "extra_intervals": 10,
+    "files": 16,
+    "benign_files": 10,
+    "spliced_files": 6,
+    "precision": 0.7419354838709677,
+    "recall": 0.39655172413793105,
+    "f1": 0.5168539325842697,
+    "file_false_positive_rate": 0.1,
+    "file_detection_rate": 0.6666666666666666,
+    "window_false_positive_rate": 0.006633499170812604,
+    "evidence_coverage": 0.997626582278481,
+    "mean_iou_including_misses": 0.29047619047619044,
+    "iou_matched": {
+      "mean": 0.4066666666666666,
+      "median": 0.25,
+      "worst": 0.2
+    },
+    "start_error_matched": {
+      "mean": 0.40472500000000017,
+      "median": 0.15781250000000036,
+      "worst": 1.3414374999999996
+    },
+    "end_error_matched": {
+      "mean": 1.2952749999999997,
+      "median": 1.0939374999999991,
+      "worst": 3.8421874999999996
+    }
+  },
+  "src07": {
+    "tp": 21,
+    "fp": 0,
+    "fn": 37,
+    "tn": 1206,
+    "undetermined_windows": 0,
+    "undetermined_tampered_windows": 0,
+    "total_windows": 1264,
+    "truth_intervals": 7,
+    "predicted_intervals": 10,
+    "missed_splices": 1,
+    "extra_intervals": 4,
+    "files": 16,
+    "benign_files": 10,
+    "spliced_files": 6,
+    "precision": 1.0,
+    "recall": 0.3620689655172414,
+    "f1": 0.5316455696202531,
+    "file_false_positive_rate": 0.0,
+    "file_detection_rate": 0.8333333333333334,
+    "window_false_positive_rate": 0.0,
+    "evidence_coverage": 1.0,
+    "mean_iou_including_misses": 0.44589104817035347,
+    "iou_matched": {
+      "mean": 0.5202062228654124,
+      "median": 0.5,
+      "worst": 0.14999999999999997
+    },
+    "start_error_matched": {
+      "mean": 0.7215104166666665,
+      "median": 0.6452187499999997,
+      "worst": 1.5511875000000002
+    },
+    "end_error_matched": {
+      "mean": 0.6656562500000004,
+      "median": 0.2856875000000003,
+      "worst": 2.9086250000000007
+    }
+  },
+  "src08": {
+    "tp": 15,
+    "fp": 0,
+    "fn": 43,
+    "tn": 1206,
+    "undetermined_windows": 4,
+    "undetermined_tampered_windows": 4,
+    "total_windows": 1264,
+    "truth_intervals": 7,
+    "predicted_intervals": 9,
+    "missed_splices": 1,
+    "extra_intervals": 3,
+    "files": 16,
+    "benign_files": 10,
+    "spliced_files": 6,
+    "precision": 1.0,
+    "recall": 0.25862068965517243,
+    "f1": 0.410958904109589,
+    "file_false_positive_rate": 0.0,
+    "file_detection_rate": 0.8333333333333334,
+    "window_false_positive_rate": 0.0,
+    "evidence_coverage": 0.9968354430379747,
+    "mean_iou_including_misses": 0.3377295271531667,
+    "iou_matched": {
+      "mean": 0.39401778167869445,
+      "median": 0.3125,
+      "worst": 0.16666666666666666
+    },
+    "start_error_matched": {
+      "mean": 0.7254062500000001,
+      "median": 0.25287499999999974,
+      "worst": 2.9516875000000002
+    },
+    "end_error_matched": {
+      "mean": 0.9109479166666666,
+      "median": 0.8178749999999999,
+      "worst": 2.2923125000000004
+    }
+  },
+  "src12": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 46,
+    "tn": 1206,
+    "undetermined_windows": 0,
+    "undetermined_tampered_windows": 0,
+    "total_windows": 1264,
+    "truth_intervals": 7,
+    "predicted_intervals": 7,
+    "missed_splices": 3,
+    "extra_intervals": 3,
+    "files": 16,
+    "benign_files": 10,
+    "spliced_files": 6,
+    "precision": 1.0,
+    "recall": 0.20689655172413793,
+    "f1": 0.34285714285714286,
+    "file_false_positive_rate": 0.0,
+    "file_detection_rate": 0.6666666666666666,
+    "window_false_positive_rate": 0.0,
+    "evidence_coverage": 1.0,
+    "mean_iou_including_misses": 0.23095238095238088,
+    "iou_matched": {
+      "mean": 0.4041666666666665,
+      "median": 0.34999999999999976,
+      "worst": 0.16666666666666663
+    },
+    "start_error_matched": {
+      "mean": 0.6191562500000003,
+      "median": 0.4857187500000002,
+      "worst": 1.4781875000000007
+    },
+    "end_error_matched": {
+      "mean": 1.3183437500000004,
+      "median": 1.306937500000001,
+      "worst": 2.5218124999999993
+    }
+  }
+}

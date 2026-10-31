@@ -1,4 +1,7 @@
 import io
+import json
+from pathlib import Path
+from member4_config import DetectorConfig
 import numpy as np
 import pandas as pd
 import soundfile as sf
@@ -8,10 +11,19 @@ import watermark as w
 import tamper_detector as d
 
 KEY = "project_secret_key"
-FROZEN = -0.00441344   # frozen threshold reported by Member 4 (commit 5d8d531)
+CALIBRATION_PATH = Path("results/member4_final/calibration.json")
 
-thr = FROZEN
-src = "value reported by Member 4 (commit 5d8d531)"
+# Use the validation-only cutoff and window settings from the same final run.
+try:
+    calibration = json.loads(CALIBRATION_PATH.read_text())
+    thr = float(calibration["threshold"])
+    cfg = DetectorConfig(**calibration["config"])
+    if not np.isfinite(thr) or not -1 <= thr <= 1:
+        raise ValueError("Invalid calibrated threshold")
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    st.error(f"Cannot load final calibration: {exc}")
+    st.stop()
+src = str(CALIBRATION_PATH)
 
 st.title("Audio Tamper Localization Demo")
 st.caption(f"Frozen threshold: {thr:.5f} (source: {src}). "
@@ -41,7 +53,7 @@ st.write("True tampered interval(s):",
 
 if st.button("Analyse"):
     ev = w.extract(x, KEY)
-    windows = d.score_windows(ev, len(x) / sr)
+    windows = d.score_windows(ev, len(x) / sr, cfg)
     found = d.detect_intervals(windows, thr)
     valid = [v for v in windows if v["valid"]]
     tm = [(v["start"] + v["end"]) / 2 for v in valid]
@@ -50,8 +62,10 @@ if st.button("Analyse"):
     if found:
         txt = "; ".join(f"{f['start']:.2f} to {f['end']:.2f} s" for f in found)
         st.error(f"Suspicious interval(s): {txt}")
+    elif not valid:
+        st.warning("Insufficient valid evidence to assess this file.")
     else:
-        st.success("No tampering found at the frozen threshold.")
+        st.info("No suspicious intervals detected at this threshold. This does not prove the audio is untampered.")
 
     fig, ax = plt.subplots(figsize=(10, 3.5))
     ax.plot(tm, sc, marker="o", ms=3, label="window score")

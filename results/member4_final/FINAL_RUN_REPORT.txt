@@ -1,0 +1,44 @@
+FINAL INTEGRATION - 30 October 2026
+Branch: member3-tamper-simulation
+Commit: 5d8d5314fac19727b4ba70a987befd92a809ae72
+Command: python main.py all --out <new experiment directory>
+The integrated build calls tamper_simulation.build_dataset; no separate duplicate build.
+31 tests passed (17 detector, 14 other).
+192 audio cases, 204 ground truth rows.
+64 validation files; 64 test files. Validation/test selection and all audio hashes verified.
+Frozen threshold: -0.004413441149903413
+Calibration: 1st percentile of valid benign validation windows only; no test tuning.
+
+Metric | previous baseline | final run
+precision | 0.792683 | 0.898734
+recall | 0.280172 | 0.306034
+f1 | 0.414013 | 0.456592
+file_detection_rate | 0.833333 | 0.750000
+file_false_positive_rate | 0.125000 | 0.025000
+mean_iou_including_misses | 0.293933 | 0.326262
+evidence_coverage | 0.945411 | 0.998616
+
+Final counts: {"tp": 71, "fp": 8, "fn": 161, "tn": 4816, "missed_splices": 7, "extra_intervals": 20, "undetermined_windows": 7}
+
+Condition summaries:
+condition=untouched: {"files": 4, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.0}
+condition=splicing: {"files": 20, "recall": 0.32608695652173914, "file_detection_rate": 0.75, "file_false_positive_rate": null}
+condition=splicing_double: {"files": 4, "recall": 0.22916666666666666, "file_detection_rate": 0.75, "file_false_positive_rate": null}
+condition=noise: {"files": 12, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.08333333333333333}
+target_snr_db=40: {"files": 4, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.0}
+target_snr_db=30: {"files": 4, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.0}
+target_snr_db=20: {"files": 4, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.25}
+condition=mp3: {"files": 12, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.0}
+condition=volume: {"files": 8, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.0}
+condition=resample: {"files": 4, "recall": null, "file_detection_rate": null, "file_false_positive_rate": 0.0}
+
+By original source (correlated variants; one music source is not general music evidence):
+src04: {"files": 16, "recall": 0.39655172413793105, "file_detection_rate": 0.6666666666666666, "file_false_positive_rate": 0.1}
+src07: {"files": 16, "recall": 0.3620689655172414, "file_detection_rate": 0.8333333333333334, "file_false_positive_rate": 0.0}
+src08: {"files": 16, "recall": 0.25862068965517243, "file_detection_rate": 0.8333333333333334, "file_false_positive_rate": 0.0}
+src12: {"files": 16, "recall": 0.20689655172413793, "file_detection_rate": 0.6666666666666666, "file_false_positive_rate": 0.0}
+
+The generic metrics.json note about missing provenance is stale: data/README.md documents source provenance.
+These are baseline results, not evidence of broad deepfake detection or a direct StreamMark benchmark.
+No repository changes were pushed. The run used an isolated checkout; local docstring changes were not included.
+Keep calibration with this exact source snapshot: edits (even docstrings) alter the detector hash.

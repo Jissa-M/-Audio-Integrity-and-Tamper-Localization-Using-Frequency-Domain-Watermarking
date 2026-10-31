@@ -1,0 +1,15 @@
+file_name,missed_splices,extra_intervals,undetermined_windows,review_note
+src04_splice_unwatermarked_0.5s_early.wav,1,0,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src04_splice_wrongkey_1.0s_mid.wav,1,0,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src04_splice_wrongkey_3.0s_early.wav,0,1,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src04_splice_unwatermarked_5.0s_mid.wav,0,5,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src04_splice_double.wav,0,0,3,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src04_noise_20dB.wav,0,4,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src07_splice_unwatermarked_0.5s_early.wav,1,0,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src07_splice_wrongkey_3.0s_early.wav,0,1,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src07_splice_unwatermarked_5.0s_mid.wav,0,3,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src08_splice_wrongkey_1.0s_mid.wav,1,0,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src08_splice_unwatermarked_5.0s_mid.wav,0,3,4,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src12_splice_unwatermarked_0.5s_early.wav,1,0,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src12_splice_unwatermarked_5.0s_mid.wav,0,3,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.
+src12_splice_double.wav,2,0,0,Observed failure/abstention; inspect score and audio plots before assigning a cause.

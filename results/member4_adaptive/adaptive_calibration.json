@@ -1,0 +1,59 @@
+{
+  "method": "absolute_cap_and_file_median_drop_v1",
+  "absolute_cap": 0.09,
+  "minimum_drop": 0.19999999999999998,
+  "config": {
+    "sample_rate": 16000,
+    "hop": 256,
+    "window_seconds": 0.5,
+    "overlap": 0.5,
+    "min_valid_fraction": 0.5,
+    "benign_quantile": 0.01,
+    "truth_overlap_fraction": 0.5
+  },
+  "selection": "Maximum validation window F1 subject to benign-file FPR <= 5%; fixed 0.5s windows, 50% overlap. Ties favor lower FPR, larger drop, lower cap. Rule: threshold=max(-1,min(cap,median(valid window scores)-minimum_drop)).",
+  "validation_summary": {
+    "absolute_cap": 0.09,
+    "minimum_drop": 0.19999999999999998,
+    "tp": 208,
+    "fp": 8,
+    "fn": 24,
+    "tn": 4816,
+    "undetermined_windows": 79,
+    "undetermined_tampered_windows": 0,
+    "total_windows": 5056,
+    "truth_intervals": 28,
+    "predicted_intervals": 31,
+    "missed_splices": 0,
+    "extra_intervals": 3,
+    "files": 64,
+    "benign_files": 40,
+    "spliced_files": 24,
+    "precision": 0.9629629629629629,
+    "recall": 0.896551724137931,
+    "f1": 0.9285714285714286,
+    "file_false_positive_rate": 0.025,
+    "file_detection_rate": 1.0,
+    "window_false_positive_rate": 0.001658374792703151,
+    "evidence_coverage": 0.984375,
+    "mean_iou_including_misses": 0.8875192505988219,
+    "iou_matched": {
+      "mean": 0.8875192505988219,
+      "median": 0.9230769230769231,
+      "worst": 0.6666666666666666
+    },
+    "start_error_matched": {
+      "mean": 0.08587276785714289,
+      "median": 0.07521875000000033,
+      "worst": 0.3280624999999997
+    },
+    "end_error_matched": {
+      "mean": 0.10189062500000012,
+      "median": 0.07578125000000036,
+      "worst": 0.4219375000000003
+    }
+  },
+  "dataset_manifest_sha256": "79717a46cd68d50201abeb5a5dbfd1a35e139b867a16a82538c7213374648065",
+  "adaptive_detector_sha256": "ea24fa5b5a8f64cfaf7343c331cb0e9f04440febf969942da30fcc9f44a532f2",
+  "note": "Parameters frozen before candidate test evaluation. Existing test set has been examined historically; independent fresh recordings still required."
+}

@@ -2,6 +2,7 @@ import io
 import json
 from pathlib import Path
 from member4_config import DetectorConfig
+from adaptive_detector import detect_adaptive
 import numpy as np
 import pandas as pd
 import soundfile as sf
@@ -11,12 +12,14 @@ import watermark as w
 import tamper_detector as d
 
 KEY = "project_secret_key"
-CALIBRATION_PATH = Path("results/member4_final/calibration.json")
+mode = st.radio("Detector mode", ["Conservative (final baseline)", "High recall (experimental)"])
+adaptive = mode.startswith("High recall")
+CALIBRATION_PATH = Path("results/member4_adaptive/adaptive_calibration.json" if adaptive else "results/member4_final/calibration.json")
 
 # Use the validation-only cutoff and window settings from the same final run.
 try:
     calibration = json.loads(CALIBRATION_PATH.read_text())
-    thr = float(calibration["threshold"])
+    thr = float(calibration["absolute_cap"] if adaptive else calibration["threshold"])
     cfg = DetectorConfig(**calibration["config"])
     if not np.isfinite(thr) or not -1 <= thr <= 1:
         raise ValueError("Invalid calibrated threshold")
@@ -26,8 +29,11 @@ except (OSError, ValueError, KeyError, TypeError) as exc:
 src = str(CALIBRATION_PATH)
 
 st.title("Audio Tamper Localization Demo")
-st.caption(f"Frozen threshold: {thr:.5f} (source: {src}). "
-           "A window is flagged when its watermark score is below this.")
+if adaptive:
+    st.caption("Experimental local-splice mode. Validation-frozen parameters; the effective cutoff depends on each file's median valid score.")
+    st.warning("Higher recall also means more false alarms: 7/40 benign test files flagged, versus 1/40 for the baseline. Assumes most audio is intact.")
+else:
+    st.caption(f"Frozen threshold: {thr:.5f} (source: {src}). A window is flagged when its watermark score is below this.")
 
 gt = pd.read_csv("results/ground_truth.csv")
 names = sorted(gt.file_name.unique())
@@ -54,7 +60,13 @@ st.write("True tampered interval(s):",
 if st.button("Analyse"):
     ev = w.extract(x, KEY)
     windows = d.score_windows(ev, len(x) / sr, cfg)
-    found = d.detect_intervals(windows, thr)
+    if adaptive:
+        found, diagnostics = detect_adaptive(windows, calibration['absolute_cap'], calibration['minimum_drop'])
+        thr = diagnostics['threshold']
+        if thr is not None:
+            st.caption(f"Effective cutoff: {thr:.5f}; file median: {diagnostics['median_score']:.5f}")
+    else:
+        found = d.detect_intervals(windows, thr)
     valid = [v for v in windows if v["valid"]]
     tm = [(v["start"] + v["end"]) / 2 for v in valid]
     sc = [v["score"] for v in valid]
@@ -69,7 +81,8 @@ if st.button("Analyse"):
 
     fig, ax = plt.subplots(figsize=(10, 3.5))
     ax.plot(tm, sc, marker="o", ms=3, label="window score")
-    ax.axhline(thr, color="black", ls="--", label="frozen threshold")
+    if thr is not None:
+        ax.axhline(thr, color="black", ls="--", label="effective threshold")
     for i, (a, b) in enumerate(true):
         ax.axvspan(a, b, color="red", alpha=0.2,
                    label="true" if i == 0 else None)
@@ -80,5 +93,4 @@ if st.button("Analyse"):
     ax.set_ylabel("Watermark score")
     ax.legend(loc="lower left")
     st.pyplot(fig)
-    st.caption("Detected intervals can cover only part of a splice because the "
-               "threshold is conservative (window recall about 31%).")
+    st.caption("Observed test window recall: 78% in experimental mode; 31% in conservative mode. Detected intervals are estimates.")
